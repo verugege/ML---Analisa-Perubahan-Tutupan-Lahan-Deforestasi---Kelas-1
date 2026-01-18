@@ -1,0 +1,33 @@
+//link : https://code.earthengine.google.com/16f276e61705a189e0719517d14e2e78
+
+//1. Pemanggilan data
+var imageCollectionSentinel = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED'); // Memanggil data
+var filterCol = imageCollectionSentinel //Memfilter data
+  .filterBounds(geometry)// Filter geometry
+  .filterDate('2025-01-30', '2025-11-30') //filter tanggal 
+  .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 50)); //filter  awan lt (lower than) 50%
+//2. Cloud Masking
+  function cloudMaskS2(image) { //function cloud mask
+  var qa = image.select('QA60'); // masking awannya
+  var cloudBitMask = 1 << 10;  //masking awan (cloud)
+  var cirrusBitMask = 1 << 11; //masking awan cirrus
+
+  var mask = qa.bitwiseAnd(cloudBitMask).eq(0) //cloudbitmask = 0
+               .and(qa.bitwiseAnd(cirrusBitMask).eq(0)); //cirrusbitmask=0
+
+  return image.updateMask(mask)
+              .select(['B4', 'B3', 'B2']) // Fokus pada RGB
+              .multiply(0.0001);           // Skala reflektansi
+}
+//3. Visualisasi Citra
+var rgb = filterCol //Pilih citra yang sudah di filter
+  .map(cloudMaskS2) //masukan function cloud mask
+  .median() //Pilih citra yang ditengah / median
+  .clip(geometry);//potong citra sesuai geometrinya.
+  Map.addLayer( //masukan map pada layer -- tambahkan citra pada layer
+  rgb,
+  {bands: ['B4', 'B3', 'B2'], min: 0, max: 0.28}, //pilih RGB = Natural color
+  'Sentinel-2 RGB Kota Langsa' //Beri penamaannya
+);
+
+Map.centerObject(geometry, 11); // Center object : geometry dengan zoom 11
