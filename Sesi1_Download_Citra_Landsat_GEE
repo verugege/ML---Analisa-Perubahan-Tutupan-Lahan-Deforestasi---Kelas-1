@@ -1,0 +1,33 @@
+//1. Pemanggilan dan memfilter data
+var landsatCol = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2') //Komentar
+  .merge(ee.ImageCollection('LANDSAT/LC09/C02/T1_L2')); // landsatCol adalah Data kita merge atau gabungkan antara L8 dan L9
+  var landsatFilter = landsatCol //filter data landsatCol
+  .filterBounds(geometry) // menentukan area studinya --- Geomtery
+  .filterDate('2025-01-30', '2025-11-30') // memfilter tanggal citra yang digunakan
+  .filter(ee.Filter.lt('CLOUD_COVER', 50)); //lt: lower than --- memfilter awan yang dibawah 50%
+//2. Membuat fungsi cloud masking
+  function cloudMaskLandsat(image) { // Cloud masking -- menambal citra yang ada awannya dengan citra yang lebih bersih
+  var qa = image.select('QA_PIXEL'); //QAPixel untuk mengetahui kualitas citra berdasarkan awannya
+
+  var cloud = qa.bitwiseAnd(1 << 3).eq(0);//memfilter awan=0
+  var shadow = qa.bitwiseAnd(1 << 4).eq(0);//memfilter bawangan awannya =0
+
+  return image.updateMask(cloud.and(shadow)) //mengembalikan citranya yang sudah difilter dengan cloud dan shadow
+              .select(['SR_B4', 'SR_B3', 'SR_B2']) // Pilih band pada citra: RGB
+              .multiply(0.0000275) //Kalikan dengan scalenya
+              .add(-0.2); //Tambahkan dengan offsetnya
+}
+//3. Memvisualisasikan data Citra
+var landsatRGB = landsatFilter //membuat variabel visualisasi
+  .map(cloudMaskLandsat) //landsatFilter yang telah di sudah di cloudmasking
+  .median() //Memilih data terbaik dari data median (nilai tengah) pada rentang waktu '2025-01-30', '2025-11-30'
+  .clip(geometry); //memotong citranya sesuai dengan geomterynya
+  Map.addLayer( //Map kita tambahkan pada layer visualisasi
+  landsatRGB,
+  {bands: ['SR_B4', 'SR_B3', 'SR_B2'], min: 0, max: 0.3}, //Band RGB = Natural Color
+  'Landsat RGB Kota Langsa' //Penamannya bisa disesuaikan
+);
+
+Map.centerObject(geometry, 11); //langsung mempusatkan tampilan data ke center object:geometry, dan 11 adalah tingkat zoomnya
+
+//Link Sumber : https://code.earthengine.google.com/da5d51dad486e4c86aea217e59578161
